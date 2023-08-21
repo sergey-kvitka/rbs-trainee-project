@@ -3,7 +3,11 @@ package file
 import (
 	"fmt"
 	"os"
+	"os/user"
+	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 )
 
 // File является виртуальным представлением файлов из файловой системы.
@@ -16,6 +20,16 @@ type File struct {
 	OwnSize      int64
 	NoPermission bool
 	InnerFiles   []File
+}
+
+// FileInfo представляет из себя DTO с основной информацией о файле.
+// В отличие от File, не содержит в себе вложенную структуру файлов
+type FileInfo struct {
+	Name           string `json:"name"`
+	IsDir          bool   `json:"isDir"`
+	FullSize       int64  `json:"fullSize"`
+	Path           string `json:"path"`
+	HavePermission bool   `json:"havePermission"`
 }
 
 // FullSize возвращает размер (в байтах) файла с учётом всех вложенных файлов.
@@ -130,4 +144,106 @@ func FormatSize(size int64) (float64, string) {
 		currentSize /= 1024
 	}
 	return currentSize, currentUnit
+}
+
+// getRootInfo возвращает информацию о файлах и директориях, расположенных внутри директории
+// root. Также возвращает время работы функции и абсолютный путь на основе указанного root
+func GetRootInfo(root string) ([]FileInfo, time.Duration, string, error) {
+	start := time.Now() // засечение времени
+	user, _ := user.Current()
+	root = preprocessPath(root, user.Name)
+
+	// проверка на директорию
+	destinationExists, err := catalogExists(root)
+	if !destinationExists {
+		if err != nil {
+			return nil, *new(time.Duration), "", err
+		}
+		return nil, *new(time.Duration), "", fmt.Errorf("каталог \"%s\" не найден", root)
+	}
+	// конвертация пути в абсолютный
+	root, err = filepath.Abs(root)
+	if err != nil {
+		return nil, *new(time.Duration), "", err
+	}
+
+	// сохранение иерархии файлов в один объект со вложенными объектами
+	rootFile, err := NewFile(root)
+	if err != nil {
+		return nil, *new(time.Duration), "", err
+	}
+
+	// получение количества вложенных файлов и проверка на то, есть ли доступ к данному файлу
+	length := len(rootFile.InnerFiles)
+	if rootFile.NoPermission || length == 0 {
+		return make([]FileInfo, 0), *new(time.Duration), root, nil
+	}
+
+	// создание WaitGroup с изначальным значением
+	// счётчика, равным количеству вложенных файлов
+	var wg sync.WaitGroup
+	wg.Add(length)
+
+	// создание структуры со срезом для сохранения информации
+	// о вложенных файлах с мьютексом для потокобезопасности
+	type InfoStorage struct {
+		sync.RWMutex
+		s []FileInfo
+	}
+	infoStorage := InfoStorage{s: make([]FileInfo, 0, length)}
+
+	for _, file := range rootFile.InnerFiles {
+		// создание горутины для каждого вложенного файла
+		go func(file File, infoStorage *InfoStorage, wg *sync.WaitGroup) {
+			defer wg.Done()
+			// создание DTO с информацией о файле
+			fileInfo := FileInfo{
+				Name:           file.Name,
+				IsDir:          file.IsDir,
+				FullSize:       file.FullSize(),
+				Path:           file.Path,
+				HavePermission: !file.NoPermission,
+			}
+			// потокобезопасная запись значения в срез
+			infoStorage.Lock()
+			infoStorage.s = append(infoStorage.s, fileInfo)
+			infoStorage.Unlock()
+		}(file, &infoStorage, &wg)
+	}
+	// ожидание завершения горутин
+	wg.Wait()
+
+	// копирование записанных данных
+	infoStorage.RLock()
+	fileInfoSlice := infoStorage.s[:]
+	infoStorage.RUnlock()
+
+	elapsed := time.Since(start) // засечение времени
+	return fileInfoSlice, elapsed, root, nil
+}
+
+// preprocessPath обрабатывает путь path таким образом, что символ ~
+// заменяется на конструкцию /home/<username>, и к строке в начале
+// добавляются символы ' ./ ', если первым её символом не является ' / '
+func preprocessPath(path string, username string) string {
+	newPath := path
+	if strings.HasPrefix(newPath, "~") {
+		newPath = strings.Replace(newPath, "~", fmt.Sprintf("/home/%s", username), 1)
+	}
+	if !strings.HasPrefix(newPath, "/") {
+		newPath = fmt.Sprintf("./%s", newPath)
+	}
+	return newPath
+}
+
+// catalogExists проверяет существование директории по указанному пути
+func catalogExists(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, nil
+	}
+	if !info.IsDir() {
+		return false, fmt.Errorf("по указанному пути расположен файл, а не директория (\"%s\")", path)
+	}
+	return true, nil
 }
