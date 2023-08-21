@@ -29,8 +29,16 @@ func getRootInfo(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		root = keys[0]
 	}
+	
+	// задание значения заголовку для понимания того, что формат возвращаемого значения - JSON
+	w.Header().Set("Content-Type", "application/json")
 	// получение информации о внутренней структуре директории
-	fileInfoSlice, elapsed, path, _ := vfile.GetRootInfo(root)
+	fileInfoSlice, elapsed, path, err := vfile.GetRootInfo(root)
+	if err != nil {
+		jsonResponse, _ := json.Marshal(map[string]string{"message": err.Error()})
+		http.Error(w, string(jsonResponse), 400)
+		return
+	}
 
 	// описание структуры объекта, который будет возвращён методом в формате JSON
 	type result struct {
@@ -38,8 +46,6 @@ func getRootInfo(w http.ResponseWriter, r *http.Request) {
 		Elapsed int64            `json:"elapsed"`
 		Path    string           `json:"path"`
 	}
-	// задание значения заголовку для понимания того, что формат возвращаемого значения - JSON
-	w.Header().Set("Content-Type", "application/json")
 	// сериализация объекта с полученными данными в JSON и запись результата в response
 	jsonResponse, _ := json.Marshal(result{Files: fileInfoSlice, Elapsed: elapsed.Microseconds(), Path: path})
 	w.Write(jsonResponse)
