@@ -11,7 +11,7 @@ const port int = 9000
 
 func main() {
 	// обработчик для получения статических элементов
-	http.Handle("/", http.FileServer(http.Dir("/static/")))
+	http.Handle("/", http.FileServer(http.Dir("./static/")))
 
 	// обработчик для получения информации о внутренней структуре директории
 	http.HandleFunc("/vfs", getRootInfo)
