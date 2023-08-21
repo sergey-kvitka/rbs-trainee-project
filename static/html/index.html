@@ -13,17 +13,17 @@
     <div class="container">
         <div class="vfs-header">
             <b>vfs</b>
-            <button style="margin-left: 300px;" onclick="testJs()">JS test button</button>
+            <button style="margin-left: 300px;" onclick="rootInfo('~/')">JS test button</button>
         </div>
 
         <div class="vfs-current-filepath">
             <p>/home/sergei-kvitka/Документы</p>
         </div>
 
-        <div class="vfs-explorer">
+        <div class="vfs-explorer" id="vfs-explorer-container">
             <div class="file-elem" title="Назад">
                 <img src="../icons/back.png" />
-                <p><b>../</b></p>
+                <p class="bold">../</p>
             </div>
             <div class="file-elem">
                 <img src="../icons/dir.png" />
@@ -32,6 +32,7 @@
             <div class="file-elem">
                 <img src="../icons/dir.png" />
                 <p>docs</p>
+                
             </div>
             <div class="file-elem">
                 <img src="../icons/dir.png" />
@@ -68,6 +69,7 @@
             <div class="file-elem">
                 <img src="../icons/dir.png" />
                 <p>long name</p>
+                <img src="../icons/lock.png" />
             </div>
             <div class="vfs-content"></div>
         </div>
