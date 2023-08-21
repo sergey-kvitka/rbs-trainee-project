@@ -1,13 +1,25 @@
 const BACKEND_DOMAIN = 'http://localhost:9000';
 
 const FILE_CONTAINER_ID = 'vfs-explorer-container';
-const FILEPATH_P_ID = 'vfs-current-filepath';
+const FILEPATH_P_ID = 'vfs-current-filepath-p';
+
+const PARAMS = new URLSearchParams(window.location.search);
+
+const DEFAULT_ROOT = '~/';
 
 function main() {
-    //rootInfo('~/');
+    let root = PARAMS.get('root');
+    rootInfo(root ? root : DEFAULT_ROOT);
+
+}
+
+function setRootParam(value) {
+    PARAMS.set('root', value);
+    return root;
 }
 
 function rootInfo(root) {
+    console.log(root)
     let url = new URL(`${BACKEND_DOMAIN}/vfs`);
     url.searchParams.set('root', root);
     let xhr = new XMLHttpRequest();
@@ -17,8 +29,9 @@ function rootInfo(root) {
 
     xhr.onload = () => {
         if (xhr.status % 100 == 2) {
-            return // TODO  
-            renderFiles(xhr.response.files);
+            // return // TODO  
+            setRootParam(root);
+            renderFiles(xhr.response.files, xhr.response.path);
             updateCurrentPath(xhr.response.path);
         }
         else alert(`Ошибка выполнения запроса\nТекст ошибки: "${xhr.response.message}"`);
@@ -29,10 +42,12 @@ function rootInfo(root) {
 function createFileElement(fileInfo, isParentDir) {
     let fileElement = document.createElement('div');
     fileElement.classList.add('file-elem');
-    fileElement.addEventListener('click', e => {
-       rootInfo(fileInfo.path); 
-    });
-    
+    if (fileInfo.isDir) {
+        fileElement.addEventListener('click', () => {
+            rootInfo(fileInfo.path);
+        });
+    }
+
     let fileIcon = document.createElement('img');
     fileIcon.src = `../icons/${isParentDir ? 'back' : (fileInfo.isDir ? 'dir' : 'file')}.png`;
     fileElement.appendChild(fileIcon);
@@ -51,21 +66,28 @@ function createFileElement(fileInfo, isParentDir) {
     return fileElement;
 }
 
-function renderFiles(fileInfoArr) {
+function renderFiles(fileInfoArr, path) {
     fileInfoArr = fileInfoArr.sort((a, b) => {
         let aName = a.name; let bName = b.name;
         return aName > bName ? 1 : aName < bName ? -1 : 0;
     });
     let fileContainer = document.getElementById(FILE_CONTAINER_ID);
-    fileInfoArr.forEach(fileInfo => {
-        let fileElement = createFileElement(fileInfo);
-        fileContainer.appendChild(fileElement);
-    });
+    fileContainer.replaceChildren(
+        [{ name: '../', path: getParentDir(path), havePermission: true, isDir: true }, fileInfoArr].map(fileInfo => {
+            let fileElement = createFileElement(fileInfo);
+            fileContainer.appendChild(fileElement);
+        }));
 }
 
 function updateCurrentPath(path) {
     let pathElement = document.getElementById(FILEPATH_P_ID);
     pathElement.innerText = path;
+}
+
+function getParentDir(path) {
+    let nodes = path.split('/');
+    nodes.pop();
+    return nodes.join('/');
 }
 
 main();
