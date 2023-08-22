@@ -7,12 +7,31 @@ const loadingInfoId = 'loading-info';
 const defaultRoot = '/home';
 
 function main() {  // * данный код будет запущен при загрузке JS-файла
-    rootInfo(defaultRoot);
+    // вызов метода для отправки запроса на получение информации о
+    // текущей директории; в качестве параметров переданы путь по умолчанию
+    // и обработчики при успешном и неудачном выполнении запроса
+    rootInfo(defaultRoot, renderNewRoot, handleResponseError);
+}
+
+// renderNewRoot запускает методы для отрисовки списка файлов и информации 
+// о текущей директории, а также скрывает элемент с информацией о загрузке данных
+function renderNewRoot(files, path) {
+    // запуск рендеринга и обновление отображаемого пути
+    renderFiles(files, path);
+    updateCurrentPath(path);
+    hideLoading(); // * скрытие информации о загрузке
+}
+
+// handleResponseError выводит сообщение об ошибке в окно alert
+// и скрывает элемент с информацией о загрузке данных
+function handleResponseError(message) {
+    hideLoading(); // * скрытие информации о загрузке
+    alert(`Ошибка выполнения запроса\nТекст ошибки: "${message}"`);
 }
 
 // rootInfo отправляет запрос для получения информации о внутренней структуре директории.
 // При успешном получении ответа запускает рендеринг вложенных файлов и обновление отображаемого пути 
-function rootInfo(root) {
+function rootInfo(root, successCallback, errorCallback) {
     // настройка AJAX-запроса (URL, параметр, тип данных ответа (JSON))
     const url = new URL(`${backendDomain}/vfs`);
     url.searchParams.set('root', root);
@@ -21,30 +40,20 @@ function rootInfo(root) {
     // GET-запрос будет отправлен на указанный URL в асинхронном режиме (true)
     xhr.open('GET', url, true);
 
-    // обработка успешного запроса
-    xhr.onload.addEventListener('load', () => {
-        // проверка HTTP-статуса
-        if (xhr.status == 200) {
-            const { path: path, files: files } = xhr.response;
-            // запуск рендеринга и обновление отображаемого пути
-            renderFiles(files, path);
-            updateCurrentPath(path);
-            // скрытие информации о загрузке
-            hideLoading();
-        }
-        else {
-            // скрытие информации о загрузке
-            hideLoading();
-            alert(`Ошибка выполнения запроса\nТекст ошибки: "${xhr.response.message}"`);
+    // обработка выполненного запроса
+    xhr.addEventListener('readystatechange', () => {
+        if (xhr.readyState == 4) { // * readyState == 4 означает, что запрос выполнен
+            if (xhr.status == 200) {
+                // обработка успешного запроса
+                const { path: path, files: files } = xhr.response;
+                successCallback(files, path);
+            }
+            else {
+                // обработка запроса, вызвавшего ошибку
+                errorCallback(xhr.response.message);
+            }
         }
     });
-    // обработка запроса, вызвавшего ошибку
-    xhr.onerror.addEventListener('error', () => {
-        // скрытие информации о загрузке
-        hideLoading();
-        alert(`Ошибка выполнения запроса`);
-    });
-
     // отображения сообщения о загрузке данных
     showLoading();
     // * отправка GET-запроса
@@ -62,7 +71,7 @@ function createFileElement(fileInfo) {
     // перехода в 'parent' директорию при нахождении в корневой директории)
     if (fileInfo.isDir && fileInfo.havePermission && fileInfo.path) {
         fileElement.addEventListener('click', () => {
-            rootInfo(fileInfo.path);
+            rootInfo(fileInfo.path, renderNewRoot, handleResponseError);
         });
     }
 
@@ -116,7 +125,7 @@ function renderFiles(fileInfoArr, path) {
     const fileContainer = document.getElementById(fileContainerId);
     fileContainer.textContent = '';
     // добавление созданных HTML-элементов в полученный контейнер
-    elements.foreach(element => {
+    elements.forEach(element => {
         fileContainer.appendChild(element);
     });
 }
