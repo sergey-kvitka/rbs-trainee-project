@@ -1,48 +1,54 @@
-const BACKEND_DOMAIN = 'http://localhost:9000';
+const backendDomain = 'http://localhost:9000';
 
-const FILE_CONTAINER_ID = 'vfs-explorer-container';
-const FILEPATH_P_ID = 'vfs-current-filepath-p';
-const LOADING_INFO_ID = 'loading-info';
+const fileContainerId = 'vfs-explorer-container';
+const filpathPId = 'vfs-current-filepath-p';
+const loadingInfoId = 'loading-info';
 
-const DEFAULT_ROOT = '~/';
+const defaultRoot = '/home';
 
 function main() {  // * данный код будет запущен при загрузке JS-файла
-    rootInfo(DEFAULT_ROOT);
+    rootInfo(defaultRoot);
 }
 
 // rootInfo отправляет запрос для получения информации о внутренней структуре директории.
 // При успешном получении ответа запускает рендеринг вложенных файлов и обновление отображаемого пути 
 function rootInfo(root) {
     // настройка AJAX-запроса (URL, параметр, тип данных ответа (JSON))
-    const url = new URL(`${BACKEND_DOMAIN}/vfs`);
+    const url = new URL(`${backendDomain}/vfs`);
     url.searchParams.set('root', root);
     const xhr = new XMLHttpRequest();
-    xhr.responseType = 'json';
-    // отправка GET-запроса на указанный URL в асинхронном режиме (true)
+    xhr.responseType = 'json'; // ответ будет парситься в JSON автоматически
+    // GET-запрос будет отправлен на указанный URL в асинхронном режиме (true)
     xhr.open('GET', url, true);
-    xhr.send();
-    // отображения сообщения о загрузке данных
-    showLoading(true);
 
     // обработка успешного запроса
-    xhr.onload = () => {
-        // скрытие информации о загрузке
-        showLoading(false);
-        // проверка HTTP-статуса (200-299 - запрос выполнен успешно)
-        if (xhr.status >= 200 && xhr.status < 300) {
-            const path = xhr.response.path;
+    xhr.onload.addEventListener('load', () => {
+        // проверка HTTP-статуса
+        if (xhr.status == 200) {
+            const { path: path, files: files } = xhr.response;
             // запуск рендеринга и обновление отображаемого пути
-            renderFiles(xhr.response.files, path);
+            renderFiles(files, path);
             updateCurrentPath(path);
+            // скрытие информации о загрузке
+            hideLoading();
         }
-        else alert(`Ошибка выполнения запроса\nТекст ошибки: "${xhr.response.message}"`);
-    }
+        else {
+            // скрытие информации о загрузке
+            hideLoading();
+            alert(`Ошибка выполнения запроса\nТекст ошибки: "${xhr.response.message}"`);
+        }
+    });
     // обработка запроса, вызвавшего ошибку
-    xhr.onerror = () => {
+    xhr.onerror.addEventListener('error', () => {
         // скрытие информации о загрузке
-        showLoading(false);
+        hideLoading();
         alert(`Ошибка выполнения запроса`);
-    }
+    });
+
+    // отображения сообщения о загрузке данных
+    showLoading();
+    // * отправка GET-запроса
+    xhr.send();
 }
 
 // createFileElement создаёт HTML-элемент для отображаемого файла на основе информации о нём
@@ -84,7 +90,7 @@ function createFileElement(fileInfo) {
 // renderFiles принимает массив с объектами с информацией о файлах и
 // отрисовывает соответствующие им HTML-элементы
 function renderFiles(fileInfoArr, path) {
-    files = fileInfoArr.slice();
+    files = [...fileInfoArr];
     // сортировка массива по свойству объектов name
     files.sort((a, b) => {
         const aName = a.name; const bName = b.name;
@@ -92,30 +98,32 @@ function renderFiles(fileInfoArr, path) {
     });
     // вставка дополнительного элемента в начало массива; данный 
     // элемент будет отвечать за переход в директорию на уровень выше
-    if (path != '/') files.unshift({
-        name: '../',
-        // если текущий путь - корневая директория, то в качестве
-        // свойства path у данного объекта будет null    
-        path: getParentDir(path),
-        havePermission: true,
-        isDir: true,
-        // свойство для отличия данного объекта от остальных
-        isParentDir: true
-    });
+    if (path != '/') {
+        files = [({
+            name: '../',
+            // если текущий путь - корневая директория, то в качестве
+            // свойства path у данного объекта будет null    
+            path: getParentDir(path),
+            havePermission: true,
+            isDir: true,
+            // свойство для отличия данного объекта от остальных
+            isParentDir: true
+        }), ...files];
+    }
     // через метод map элементы массива конвертируются в HTML-элементы
     const elements = files.map(fileInfo => createFileElement(fileInfo));
     // получение элемента-контейнера файлов и его очистка
-    const fileContainer = document.getElementById(FILE_CONTAINER_ID);
+    const fileContainer = document.getElementById(fileContainerId);
     fileContainer.textContent = '';
     // добавление созданных HTML-элементов в полученный контейнер
-    for (const element of elements) {
+    elements.foreach(element => {
         fileContainer.appendChild(element);
-    }
+    });
 }
 
 // updateCurrentPath устанавливает в содержимое элемента с текущим путём новое значение
 function updateCurrentPath(path) {
-    const pathElement = document.getElementById(FILEPATH_P_ID);
+    const pathElement = document.getElementById(filpathPId);
     pathElement.innerText = path;
 }
 
@@ -127,12 +135,15 @@ function getParentDir(path) {
     return nodes.length > 1 ? nodes.join('/') : '/';
 }
 
-// showLoading, в рависимости от переданного boolean значения,
-// скрывает или показывает элемент с информацией о загрузке данных
-function showLoading(show) {
-    const loadingInfo = document.getElementById(LOADING_INFO_ID);
-    if (show) loadingInfo.classList.remove('display-none');
-    else loadingInfo.classList.add('display-none');
+// hideLoading скрывает элемент с информацией о загрузке данных
+function hideLoading() {
+    const loadingInfo = document.getElementById(loadingInfoId);
+    loadingInfo.classList.add('display-none');
+}
+// showLoading показывает элемент с информацией о загрузке данных
+function showLoading() {
+    const loadingInfo = document.getElementById(loadingInfoId);
+    loadingInfo.classList.remove('display-none');
 }
 
 main(); // * запуск main
