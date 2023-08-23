@@ -12,7 +12,7 @@ const defaultRoot = "/home"
 
 func main() {
 	// обработчик для получения статических элементов
-	http.Handle("/", http.FileServer(http.Dir("./static/")))
+	http.Handle("/", http.FileServer(http.Dir("./static/dist")))
 
 	// обработчик для получения информации о внутренней структуре директории
 	http.HandleFunc("/vfs", getRootInfo)
