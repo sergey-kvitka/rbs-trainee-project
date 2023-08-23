@@ -1,16 +1,14 @@
-const backendDomain = 'http://localhost:9000';
+const domain = window.location.toString();
 
 const fileContainerId = 'vfs-explorer-container';
 const filpathPId = 'vfs-current-filepath-p';
 const loadingInfoId = 'loading-info';
 
-const defaultRoot = '/home';
-
 function main() {  // * данный код будет запущен при загрузке JS-файла
     // вызов метода для отправки запроса на получение информации о
     // текущей директории; в качестве параметров переданы путь по умолчанию
     // и обработчики при успешном и неудачном выполнении запроса
-    rootInfo(defaultRoot, renderNewRoot, handleResponseError);
+    rootInfo(null, renderNewRoot, handleResponseError);
 }
 
 // renderNewRoot запускает методы для отрисовки списка файлов и информации 
@@ -33,8 +31,8 @@ function handleResponseError(message) {
 // Принимает путь к директории и функции для обработки успешного и неудачного выполнения запроса
 function rootInfo(root, successCallback, errorCallback) {
     // настройка AJAX-запроса (URL, параметр, тип данных ответа (JSON))
-    const url = new URL(`${backendDomain}/vfs`);
-    url.searchParams.set('root', root);
+    const url = new URL(`${domain}vfs`);
+    if (root) url.searchParams.set('root', root);
     const xhr = new XMLHttpRequest();
     xhr.responseType = 'json'; // ответ будет парситься в JSON автоматически
     // GET-запрос будет отправлен на указанный URL в асинхронном режиме (true)
