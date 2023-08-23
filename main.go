@@ -8,6 +8,7 @@ import (
 )
 
 const port int = 9000
+const defaultRoot = "/home"
 
 func main() {
 	// обработчик для получения статических элементов
@@ -23,8 +24,8 @@ func main() {
 // getRootInfo является функцией обработки запроса для получения информации о внутренней
 // структуре директории. Путь к директории задаётся через URL-параметр root
 func getRootInfo(w http.ResponseWriter, r *http.Request) {
-	// получение значение параметра root. Значение по умолчанию - домашняя директория
-	root := "~/"
+	// получение значение параметра root. Если параметр не был получен, значение root останется по умолчанию
+	root := defaultRoot
 	keys, ok := r.URL.Query()["root"]
 	if ok {
 		root = keys[0]
