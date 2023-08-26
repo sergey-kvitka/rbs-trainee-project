@@ -13,12 +13,21 @@
 }
 
 .vfs-header {
+    position: relative;
     grid-area: 1 / 1 / 2 / 3;
     background: rgb(103, 103, 194);
     font-size: 32px;
     display: flex;
     align-items: center;
     padding: 0 40px;
+    color: white;
+}
+
+.stat-link {
+    position: absolute;
+    right: 40px;
+    font-size: 20px;
+    text-decoration: underline !important;
     color: white;
 }
 
