@@ -108,6 +108,9 @@ func getInnerFiles(path string) ([]File, error) {
 		file.Name = entry.Name()
 		file.IsDir = entry.IsDir()
 		file.Path = fmt.Sprintf("%s%s%s", path, "/", file.Name)
+		if file.Path == "/proc" {
+			continue
+		}
 		if file.IsDir {
 			// рекурсивно вызываем функцию, если данный файл - директория
 			innerFiles, err := getInnerFiles(file.Path)
@@ -148,7 +151,7 @@ func FormatSize(size int64) (float64, string) {
 
 // getRootInfo возвращает информацию о файлах и директориях, расположенных внутри директории
 // root. Также возвращает время работы функции и абсолютный путь на основе указанного root
-func GetRootInfo(root string) ([]FileInfo, time.Duration, string, error) {
+func GetRootInfo(root string) ([]FileInfo, time.Duration, string, int64, error) {
 	start := time.Now() // засечение времени
 	user, _ := user.Current()
 	root = preprocessPath(root, user.Name)
@@ -157,26 +160,26 @@ func GetRootInfo(root string) ([]FileInfo, time.Duration, string, error) {
 	destinationExists, err := catalogExists(root)
 	if !destinationExists {
 		if err != nil {
-			return nil, *new(time.Duration), "", err
+			return nil, *new(time.Duration), "", 0, err
 		}
-		return nil, *new(time.Duration), "", fmt.Errorf("каталог \"%s\" не найден", root)
+		return nil, *new(time.Duration), "", 0, fmt.Errorf("каталог \"%s\" не найден", root)
 	}
 	// конвертация пути в абсолютный
 	root, err = filepath.Abs(root)
 	if err != nil {
-		return nil, *new(time.Duration), "", err
+		return nil, *new(time.Duration), "", 0, err
 	}
 
 	// сохранение иерархии файлов в один объект со вложенными объектами
 	rootFile, err := NewFile(root)
 	if err != nil {
-		return nil, *new(time.Duration), "", err
+		return nil, *new(time.Duration), "", 0, err
 	}
 
 	// получение количества вложенных файлов и проверка на то, есть ли доступ к данному файлу
 	length := len(rootFile.InnerFiles)
 	if rootFile.NoPermission || length == 0 {
-		return make([]FileInfo, 0), *new(time.Duration), root, nil
+		return make([]FileInfo, 0), *new(time.Duration), root, 0, nil
 	}
 
 	// создание WaitGroup с изначальным значением
@@ -218,8 +221,12 @@ func GetRootInfo(root string) ([]FileInfo, time.Duration, string, error) {
 	fileInfoSlice := infoStorage.s[:]
 	infoStorage.RUnlock()
 
+	var totalSize int64 = 0
+	for _, fileInfo := range fileInfoSlice {
+		totalSize += fileInfo.FullSize
+	}
 	elapsed := time.Since(start) // засечение времени
-	return fileInfoSlice, elapsed, root, nil
+	return fileInfoSlice, elapsed, root, totalSize, nil
 }
 
 // preprocessPath обрабатывает путь path таким образом, что символ ~
